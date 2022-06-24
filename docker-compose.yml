@@ -1,0 +1,42 @@
+version: '2.3'
+
+services:
+  db:
+    image: mysql
+    command: --default-authentication-plugin=mysql_native_password
+    restart: always
+    ports:
+      - 3306:3306
+    environment:
+      - MYSQL_ROOT_PASSWORD=example
+
+  adminer:
+    image: adminer
+    restart: always
+    ports: 
+      - 8080:8080
+
+  app:
+    image: app
+    env_file: .env
+    # runtime: nvidia
+    pid: "bridge"
+    ports:
+      - 5010:5000
+    stdin_open: true
+    depends_on:
+      - db
+      - adminer
+    tty: true
+    volumes:
+      - .:/workspace
+    build:
+      context: .
+      network: host
+      dockerfile: ./Dockerfile
+    command: gunicorn --log-level debug --bind 0.0.0.0:5000 backend:app # команда для поднятия сервиса с моделями
+
+volumes:
+  db:
+  app:
+  adminer:
