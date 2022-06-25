@@ -16,10 +16,11 @@ class Detection_DB(Base):
     id = Column(Integer, primary_key=True)
     update_time = Column(DateTime)
     service_result = Column(Text(5000))
+    conclusion = Column(Text(5000))
     # picture = Column(Text(5000))
     
     def __repr__(self):
-        return "<Detection_DB(update_time='%s', service_result='%s')>" % (self.update_time, self.service_result)
+        return "<Detection_DB(update_time='%s', service_result='%s', conclusion='%s')>" % (self.update_time, self.service_result, self.conclusion)
 
 
 def main():

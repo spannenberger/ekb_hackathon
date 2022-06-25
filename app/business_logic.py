@@ -93,16 +93,19 @@ class DetectionHandler(Handler):
             return all_bboxes
 
         for bbox in model_output:
-            if bbox[-1] > self.threshold: 
-                all_bboxes.append({
-                    'bbox': {
-                        'x1': int(bbox[0]), 
-                        'y1': int(bbox[1]),
-                        'x2': int(bbox[2]), 
-                        'y2': int(bbox[3])
-                        },
-                    'probability': int(bbox[-1] * 100)
-                    })
+            try:
+                if bbox[-1] > self.threshold: 
+                    all_bboxes.append({
+                        'bbox': {
+                            'x1': int(bbox[0]), 
+                            'y1': int(bbox[1]),
+                            'x2': int(bbox[2]), 
+                            'y2': int(bbox[3])
+                            },
+                        'probability': int(bbox[-1] * 100)
+                        })
+            except:
+                continue
                 
         return all_bboxes
 

@@ -4,6 +4,7 @@ from app.db import Detection_DB
 from sqlalchemy import insert
 from app import app
 import time
+from tools.conclusion import get_conclusion
 
 handler, classes_dict = init_models()
 session = init_db()
@@ -28,14 +29,15 @@ def ekb_service():
     response = {'message' : 'image received. size={}x{}'.format(img.shape[1], img.shape[0]),
                 'image' : {'bbox': result}
                 }
-    
+    conclusion = get_conclusion(response)
+
     session.execute(
             insert(Detection_DB),
             [
                 {
                     "update_time": f"{time.strftime('%Y-%m-%d %H:%M:%S')}", 
                     "service_result": f"{response}",
-                    # "picture": f"{json.dumps(img.tolist())}"
+                    "conclusion": f"{conclusion}"
                 }
             ]
         )
