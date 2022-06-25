@@ -7,7 +7,7 @@ import time
 
 engine = create_engine(os.getenv('DB_URL', ''))
 # engine = create_engine("mysql+mysqlconnector://root:example@10.10.66.112:3306/test_db")
-# import pdb;pdb.set_trace()
+
 Base = declarative_base()
 Base.metadata.create_all(engine)
 
@@ -17,7 +17,6 @@ class Detection_DB(Base):
     update_time = Column(DateTime)
     service_result = Column(Text(5000))
     conclusion = Column(Text(5000))
-    # picture = Column(Text(5000))
     
     def __repr__(self):
         return "<Detection_DB(update_time='%s', service_result='%s', conclusion='%s')>" % (self.update_time, self.service_result, self.conclusion)
