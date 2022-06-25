@@ -16,7 +16,44 @@ from typing import Dict
 import requests
 import cv2
 from tqdm import tqdm
+import dash_bootstrap_components as dbc
+table_header = [
+    html.Thead(html.Tr([html.Th("Настройки"), html.Th("Данные")]))
+]
+obj_1 = dcc.Dropdown(
+    id="dropdown-graph-1", 
+    options=[{'label': 'id Ребенка_1', 'value': 'visual'},{'label': 'id Ребенка_2', 'value': 'detection'}], 
+    value='detection', 
+    searchable=False, 
+    clearable=False, 
+    style={'width': '60%'}
+)
 
+obj_2 = dcc.Dropdown(
+    id="dropdown-graph-2", 
+    options=[{'label': 'id Садика_1', 'value': 'visual'},{'label': 'id Садика_1', 'value': 'detection'}], 
+    value='detection', 
+    searchable=False, 
+    clearable=False, 
+    style={'width': '60%'}
+)
+obj_3 = dcc.Dropdown(
+    id="dropdown-graph-3", 
+    options=[{'label': 'Дата обследования_1', 'value': 'visual'},{'label': 'Дата обследования_1', 'value': 'detection'}], 
+    value='detection', 
+    searchable=False, 
+    clearable=False, 
+    style={'width': '60%'}
+)
+row1 = html.Tr([html.Td(obj_1), html.Td("Температура: 36.8")])
+row2 = html.Tr([html.Td(obj_2), html.Td("Больное горло: нет")])
+row3 = html.Tr([html.Td(obj_3), html.Td("Найдено зубов: 13(65%)")])
+row4 = html.Tr([html.Td(""), html.Td("Найдено заболеваний: caries-0")])
+# row5 = html.Tr([html.Td(""), html.Td("Astra")])
+
+table_body = [html.Tbody([row1, row2, row3, row4])]
+
+table = dbc.Table(table_header + table_body, bordered=True)
 
 DEBUG = True
 TEETH_NUM = 20
@@ -239,6 +276,12 @@ app.layout = html.Div(
                                     style={'width': '60%'}
                                 )
                             ]
+                        ),
+                        dbc.Table(
+                            # using the same table as in the above example
+                            table_header + table_body,
+                            id="table-color",
+                            color="primary",
                         )
                     ]
                 )
