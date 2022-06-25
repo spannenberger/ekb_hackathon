@@ -5,7 +5,7 @@ from tqdm import tqdm
 import argparse
 import os
 
-from tools.drawing_meta import draw_contours
+from utils import draw_contours
 
 parser = argparse.ArgumentParser(description='image recognition')
 
