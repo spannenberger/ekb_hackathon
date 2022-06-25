@@ -27,7 +27,7 @@ def init_models():
     detection_model = MmDetectionModel(detection_model_path, detection_config_path) # we can change detection class here
     metric_model = ViTMetricModel(extractor, metric_model_path, csv_path) # we can change metric learning class here
 
-    detection_handler = DetectionHandler(detection_model, threshold=0.5)
+    detection_handler = DetectionHandler(detection_model, threshold=0.4)
     metric_handler = MetricLearningHandler(metric_model, classes_dict, n_neighbors=1)
     habarovsk_handler = TeethHackSolution(detection_handler, metric_handler)
     
