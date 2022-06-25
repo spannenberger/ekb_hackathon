@@ -19,7 +19,8 @@ from tqdm import tqdm
 
 
 DEBUG = True
-FRAMERATE = 24.0
+TEETH_NUM = 20
+DISEASES_CLASSES = ["teeth", "caries"]
 URL = 'http://10.10.66.112:5010/api/ekb_service'
 
 content_type = 'image/jpeg'
@@ -42,7 +43,7 @@ def load_data(path):
 
     # The list of classes, and the number of classes
     file_names = images_info_df["file_name"].unique().tolist()
-    classes_list = images_info_df["class"].tolist()
+    classes_list = images_info_df["class"].unique().tolist()
     # classes_list = video_info_df["class_str"].value_counts().index.tolist()
     n_classes = len(classes_list)
     bboxes = images_info_df["bbox"].tolist()
@@ -51,6 +52,7 @@ def load_data(path):
     # Gets the smallest value needed to add to the end of the classes list to get a square matrix
     root_round = np.ceil(np.sqrt(len(classes_list)))
     total_size = root_round ** 2
+    # import pdb;pdb.set_trace()
     padding_value = int(total_size - n_classes)
     classes_padded = np.pad(classes_list, (0, padding_value), mode='constant')
 
@@ -62,7 +64,7 @@ def load_data(path):
 
     data_dict = {
         "video_info_df": images_info_df,
-        "n_classes": n_classes,
+        "n_classes": len(DISEASES_CLASSES),
         "classes_matrix": classes_matrix,
         "classes_padded": classes_padded,
         "root_round": root_round,
@@ -196,8 +198,9 @@ app.layout = html.Div(
                                 dcc.Upload(
                                     id='upload-image',
                                     children=html.Div([
-                                        'Drag and Drop or ',
-                                        html.A('Select Files')
+                                        'Перетащите или ',
+                                        html.A('Выберите'),
+                                        ' изображение'
                                     ]),
                                     style={
                                         'width': '100%',
@@ -209,6 +212,7 @@ app.layout = html.Div(
                                         'textAlign': 'center',
                                         'margin': '1px'
                                     },
+                                    
                                     # Allow multiple files to be uploaded
                                     multiple=True
                                 )
@@ -222,7 +226,7 @@ app.layout = html.Div(
                         html.Div(
                             className='control-element',
                             children=[
-                                html.Div(children=["Graph View Mode:"], style={'width': '40%'}),
+                                html.Div(children=["Режим отображения аналитики:"], style={'width': '40%'}),
                                 dcc.Dropdown(
                                     id="dropdown-graph-view-mode",
                                     options=[
@@ -266,6 +270,16 @@ app.layout = html.Div(
     ]
 )
 
+@app.callback(
+    [Output("progress", "value"), Output("progress", "label")],
+    [Input("progress-interval", "n_intervals")],
+)
+def update_progress(n):
+    # check progress of some background process, in this example we'll just
+    # use n_intervals constrained to be in 0-100
+    progress = min(n % 110, 100)
+    # only add text after 5% progress to ensure text isn't squashed too much
+    return progress, f"{progress} %" if progress >= 5 else ""
 
 # Data Loading
 @app.server.before_first_request
@@ -275,6 +289,11 @@ def load_all_footage():
     # Load the dictionary containing all the variables needed for analysis
     data_dict = {
         'teeth': load_data("data/service_annot.csv"),
+        'service_responce': {
+            "all_teeth_count": 20,
+            "teeth_count": 10,
+            "caries_count": 5
+        }
     }
 
     url_dict = {
@@ -302,8 +321,22 @@ def parse_contents(contents, filename, date):
     _, img_encoded = cv2.imencode('.jpg', img)
     data = img_encoded.tostring()
     # import pdb;pdb.set_trace()
+
     response = requests.post(URL, data=data, headers=headers)
     metadata = response.json()['image']
+    # import pdb;pdb.set_trace()
+
+    all_teeth_count = len(metadata["bbox"])
+    teeth_count = len([label["class_name"] for label in metadata["bbox"] if label["class_name"]=="teeth"])
+    caries_count = all_teeth_count - teeth_count
+    data_dict.update({
+        "service_responce": {
+            "all_teeth_count": all_teeth_count,
+            "teeth_count": teeth_count,
+            "caries_count": caries_count
+            }
+    })
+
     draw_contours(img, metadata)
     image = Image.fromarray(img)
     buffer = io.BytesIO()
@@ -427,7 +460,7 @@ def update_detection_mode(value):
             ),
             html.Div(
                 children=[
-                    html.P(children="Detection Score of Most Probable Objects",
+                    html.P(children="Количество найденных зубов сервисом",
                            className='plot-title'),
                     dcc.Graph(
                         id="bar-score-graph",
@@ -457,55 +490,38 @@ def update_score_bar(n):
             'range': [0, 1]
         }
     )
-    # print(current_time, FRAMERATE)
-    # if current_time is not None:
-    #     current_frame = round(current_time * FRAMERATE)
-
-    #     if n > 0 and current_frame > 0:
     video_info_df = data_dict["teeth"]["video_info_df"]
-
-    # Select the subset of the dataset that correspond to the current frame
-    # frame_df = video_info_df[video_info_df["frame"] == current_frame]
-
-    # Select only the frames above the threshold
-    # threshold_dec = threshold / 100  # Threshold in decimal
-    # frame_df = frame_df[frame_df["score"] > threshold_dec]
-
-    # Select up to 8 frames with the highest scores
-    # frame_df = frame_df[:min(8, frame_df.shape[0])]
-
-    # Add count to object names (e.g. person --> person 1, person --> person 2)
-    # objects = frame_df["class_str"].tolist()
-    # object_count_dict = {x: 0 for x in set(objects)}  # Keeps count of the objects
-    # objects_wc = []  # Object renamed with counts
-    # for object in objects:
-    #     object_count_dict[object] += 1  # Increment count
-    #     objects_wc.append(f"{object} {object_count_dict[object]}")
+    service_responce = data_dict["service_responce"]
+    # print(service_responce)
+    teeth_ratio = round(service_responce["teeth_count"] / service_responce["all_teeth_count"], 2)
+    caries_ratio = round(service_responce["caries_count"] / service_responce["all_teeth_count"], 2)
+    # print(teeth_ratio, caries_ratio)
+    teeth_percent = teeth_ratio * 100
+    caries_percent = caries_ratio * 100
+    # print(teeth_percent, caries_percent)
+    teeth_count = service_responce["teeth_count"]
+    caries_count = service_responce["caries_count"]
 
     colors = list('rgb(250,79,86)' for i in range(2))
-
-    # Add text information
-    # y_text = [f"{round(value * 100)}% confidence" for value in video_info_df["score"].tolist()]
 
     figure = go.Figure({
         'data': [{'hoverinfo': 'x+text',
                     'name': 'Detection Scores',
-                    'text': ["70%", "30%"],
+                    'text': [teeth_count, caries_count],
                     'type': 'bar',
                     'x': ["teeth", "caries"],
                     'marker': {'color': colors},
-                    'y': [0.70, 0.30]}],
+                    'y': [teeth_count, caries_count]}],
         'layout': {'showlegend': False,
                     'autosize': False,
                     'paper_bgcolor': 'rgb(249,249,249)',
                     'plot_bgcolor': 'rgb(249,249,249)',
                     'xaxis': {'automargin': True, 'tickangle': -45},
-                    'yaxis': {'automargin': True, 'range': [0, 1], 'title': {'text': 'Score'}}}
+                    'yaxis': {'automargin': True, 'range': [0, TEETH_NUM], 'title': {'text': 'Кол-во зубов'}}}
         }
     )
     return figure
 
-    # return go.Figure(data=[go.Bar()], layout=layout)  # Returns empty bar
 
 
 @app.callback(Output("pie-object-count", "figure"),
@@ -523,27 +539,29 @@ def update_object_count_pie(n):
             b=15
         )
     )
-
-    # if current_time is not None:
-    #     current_frame = round(current_time * FRAMERATE)
-
-    #     if n > 0 and current_frame > 0:
     video_info_df = data_dict["teeth"]["video_info_df"]
-
-    # Select the subset of the dataset that correspond to the current frame
-    # frame_df = video_info_df[video_info_df["frame"] == current_frame]
-
-    # Select only the frames above the threshold
-    # threshold_dec = threshold / 100  # Threshold in decimal
-    # frame_df = frame_df[frame_df["score"] > threshold_dec]
+    service_responce = data_dict["service_responce"]
+    # print(service_responce)
+    teeth_ratio = round(service_responce["teeth_count"] / service_responce["all_teeth_count"], 2)
+    caries_ratio = round(service_responce["caries_count"] / service_responce["all_teeth_count"], 2)
+    # print(teeth_ratio, caries_ratio)
+    teeth_percent = teeth_ratio * 100
+    caries_percent = caries_ratio * 100
+    # print(teeth_percent, caries_percent)
+    teeth_count = service_responce["teeth_count"]
+    caries_count = service_responce["caries_count"]
+    final = []
+    final.append(teeth_count)
+    final.append(caries_count)
 
     # Get the count of each object class
     class_counts = video_info_df["class"].value_counts()
 
     classes = class_counts.index.tolist()  # List of each class
     counts = class_counts.tolist()  # List of each count
+    print(counts, classes)
 
-    text = [f"{count} detected" for count in counts]
+    text = [f"{count} detected" for count in final]
 
     # Set colorscale to piechart
     colorscale = ['#fa4f56', '#fe6767', '#ff7c79', '#ff908b', '#ffa39d', '#ffb6b0', '#ffc8c3', '#ffdbd7',
@@ -558,8 +576,6 @@ def update_object_count_pie(n):
         marker={'colors': colorscale[:len(classes)]}
     )
     return go.Figure(data=[pie], layout=layout)
-
-    # return go.Figure(data=[go.Pie()], layout=layout)  # Returns empty pie chart
 
 
 @app.callback(Output("heatmap-confidence", "figure"),
@@ -584,10 +600,21 @@ def update_heatmap_confidence(n):
 
     #     if n > 0 and current_frame > 0:
             # Load variables from the data dictionary
-    print(data_dict.keys())
+    # print(data_dict.keys())
     video_info_df = data_dict["teeth"]["video_info_df"]
+    service_responce = data_dict["service_responce"]
+    # print(service_responce)
+    teeth_ratio = round(service_responce["teeth_count"] / service_responce["all_teeth_count"], 2)
+    caries_ratio = round(service_responce["caries_count"] / service_responce["all_teeth_count"], 2)
+    # print(teeth_ratio, caries_ratio)
+    teeth_percent = teeth_ratio * 100
+    caries_percent = caries_ratio * 100
+    # print(teeth_percent, caries_percent)
+    teeth_count = service_responce["teeth_count"]
+    caries_count = service_responce["caries_count"]
+    # video_info_df = data_dict["teeth"]["video_info_df"]
     classes_padded = data_dict["teeth"]["classes_padded"]
-    print(classes_padded)
+    # print(classes_padded)
     root_round = data_dict["teeth"]["root_round"]
     classes_matrix = data_dict["teeth"]["classes_matrix"]
 
@@ -620,7 +647,7 @@ def update_heatmap_confidence(n):
     else:
         colorscale = [[0, '#f9f9f9'], [1, '#f9f9f9']]
 
-    hover_text = [f"{score * 100:.2f}% confidence" for score in score_list]
+    hover_text = [f"{teeth_percent}% confidence", f"{caries_percent}% confidence", f"0% confidence", f"0% confidence"]
     hover_text = np.reshape(hover_text, (-1, int(root_round)))
     hover_text = np.flip(hover_text, axis=0)
 
