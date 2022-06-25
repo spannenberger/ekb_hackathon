@@ -1,7 +1,6 @@
-from app.models import MmDetectionModel, SahiDetectionModel, ViTMetricModel
+from app.models import MmDetectionModel, ViTMetricModel
 from app.business_logic import DetectionHandler, MetricLearningHandler
-from app.habarovsk_solution import WalrusHackSolution
-from app.samara_solution import TigersHackHandler
+from app.ekb_solution import TeethHackSolution
 from sqlalchemy.orm import sessionmaker
 from app.db import engine
 import numpy as np
@@ -23,15 +22,14 @@ def init_models():
     metric_model_path = os.getenv('METRIC_MODEL', '')
     csv_path = os.getenv('METRIC_CSV_PATH', '')
 
-    classes_dict = {0: 'small', 1: 'big'}  # {0: 'leopard', 1: 'princess', 2: 'tigers', 3: 'other animal'}
+    classes_dict = {0: 'teeth', 1: 'caries'}
 
     detection_model = MmDetectionModel(detection_model_path, detection_config_path) # we can change detection class here
     metric_model = ViTMetricModel(extractor, metric_model_path, csv_path) # we can change metric learning class here
 
     detection_handler = DetectionHandler(detection_model, threshold=0.5)
     metric_handler = MetricLearningHandler(metric_model, classes_dict, n_neighbors=1)
-    # samara_handler = TigersHackHandler(detection_handler, metric_handler)
-    habarovsk_handler = WalrusHackSolution(detection_handler, metric_handler)
+    habarovsk_handler = TeethHackSolution(detection_handler, metric_handler)
     
     return habarovsk_handler, classes_dict
 

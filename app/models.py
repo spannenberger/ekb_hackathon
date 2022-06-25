@@ -1,52 +1,10 @@
 from mmdet.apis import init_detector, inference_detector
 from transformers import ViTFeatureExtractor, ViTModel
-from sahi.predict import get_sliced_prediction
 from sklearn.preprocessing import LabelEncoder
-from sahi.model import MmdetDetectionModel
 from mmdet.apis import inference_detector
 from mmcv import Config
 import pandas as pd
-import numpy as np
 import torch
-
-
-class SahiDetectionModel:
-    """Реализация модели SahiDetection"""
-    
-    def __init__(
-        self,
-        model_path: str,
-        config_path: str,
-        ):
-        
-        device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
-        
-        self.detection_model = MmdetDetectionModel(
-            model_path=model_path,
-            config_path=config_path,
-            device=device
-            )
-
-    def get_model_prediction(self, img):
-        prediction = get_sliced_prediction(
-            img, 
-            self.detection_model, 
-            slice_height = 2048, 
-            slice_width = 2048
-            )
-        res = []
-        final = []
-        prediction = prediction.object_prediction_list
-        for item in prediction:
-            bbox = item.bbox.to_voc_bbox()
-            bbox.append(item.score.value)
-            bbox = np.asanyarray(bbox, dtype=np.float32)
-            res.append(bbox)
-            
-        res = np.asarray(res, dtype=np.float32)
-        final.append(res)
-        return final
-
 
 class MmDetectionModel:
     """Реализация модели MMDet"""

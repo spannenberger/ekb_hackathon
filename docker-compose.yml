@@ -19,7 +19,12 @@ services:
   app:
     image: app
     env_file: .env
-    # runtime: nvidia
+    # resources:
+    #   reservations:
+    #     devices:
+    #       - driver: nvidia
+    #         count: 1
+    #         capabilities: [gpu]
     pid: "bridge"
     ports:
       - 5010:5000
@@ -34,7 +39,7 @@ services:
       context: .
       network: host
       dockerfile: ./Dockerfile
-    command: gunicorn --log-level debug --bind 0.0.0.0:5000 backend:app # команда для поднятия сервиса с моделями
+    # command: gunicorn --log-level debug --bind 0.0.0.0:5000 backend:app # команда для поднятия сервиса с моделями
 
 volumes:
   db:

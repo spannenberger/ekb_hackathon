@@ -20,20 +20,8 @@ def index():
     return render_template('index.html')
 
 
-@app.route('/api/samara_service', methods=['POST'])
-def samara_service():
-    
-    result, img = handler.process(request, classes_dict)
-
-    response = {'message' : 'image received. size={}x{}'.format(img.shape[1], img.shape[0]),
-                'image' : {'bbox': result}
-                }
-
-    return response
-
-
-@app.route('/api/habarovsk_service', methods=['POST'])
-def habarovsk_service():
+@app.route('/api/ekb_service', methods=['POST'])
+def ekb_service():
     
     result, img = handler.process(request, classes_dict)
 

@@ -175,7 +175,7 @@ class MetricLearningHandler(Handler):
         }
         self.knn = KNeighborsClassifier(n_neighbors=self.n_neighbors, metric='cosine')
         self.knn.fit(self.metric_model.base, self.metric_model.classes)
-        
+        # import pdb;pdb.set_trace()
         for metric_predict in tqdm(model_output):
             metric_predict = metric_predict.reshape(1, -1)
             distance, label = self.knn.kneighbors(metric_predict, n_neighbors=1, return_distance=True)

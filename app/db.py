@@ -5,7 +5,9 @@ from sqlalchemy import insert
 import os
 import time
 
-engine = create_engine(os.getenv('DB_URL', ''))
+# engine = create_engine(os.getenv('DB_URL', ''))
+engine = create_engine("mysql+mysqlconnector://root:example@10.10.66.112:3306/test_db")
+# import pdb;pdb.set_trace()
 Base = declarative_base()
 Base.metadata.create_all(engine)
 

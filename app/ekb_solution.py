@@ -1,6 +1,6 @@
 from app.business_logic import DetectionHandler, MetricLearningHandler
 
-class WalrusHackSolution:
+class TeethHackSolution:
     """Хэндлер для детекции моржей"""
     
     def __init__(self, detection_handler: DetectionHandler, metric_handler: MetricLearningHandler):
@@ -26,10 +26,10 @@ class WalrusHackSolution:
         
         metric_input = (result, img)
         metric_result = self.metric_handler.process(metric_input)
-        
+        import pdb;pdb.set_trace()
         for idx in range(len(result)):
             
-            if metric_result['distances'][idx] < 0.42:
+            if metric_result['distances'][idx] > 0.01:
                 result[idx].update({'class_name': classes_dict[metric_result['labels'][idx]]})
                 
             else:
