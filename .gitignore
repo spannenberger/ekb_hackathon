@@ -157,7 +157,7 @@ siamese_gpt/
 detection_dataset/
 dataset/
 train_walrus/
-*.csv
+
 source/
 test_images/
 cutted_clear_dataset_v2/
