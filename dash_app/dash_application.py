@@ -15,6 +15,7 @@ from PIL import Image
 from typing import Dict
 import requests
 import cv2
+import os
 from tqdm import tqdm
 import dash_bootstrap_components as dbc
 table_header = [
@@ -55,10 +56,10 @@ table_body = [html.Tbody([row1, row2, row3, row4])]
 
 table = dbc.Table(table_header + table_body, bordered=True)
 
-DEBUG = True
+DEBUG = False
 TEETH_NUM = 20
 DISEASES_CLASSES = ["teeth", "caries"]
-URL = 'http://10.10.66.112:5010/api/ekb_service'
+URL = os.getenv('SERVICE_URL', '')
 
 content_type = 'image/jpeg'
 headers = {'content-type': content_type}
