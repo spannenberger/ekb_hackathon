@@ -28,6 +28,7 @@ services:
     pid: "bridge"
     ports:
       - 5010:5000
+      - 8050:8050
     stdin_open: true
     depends_on:
       - db
@@ -39,7 +40,7 @@ services:
       context: .
       network: host
       dockerfile: ./Dockerfile
-    # command: gunicorn --log-level debug --bind 0.0.0.0:5000 backend:app # команда для поднятия сервиса с моделями
+    # command: gunicorn --log-level debug --timeout 360 --bind 0.0.0.0:5000 backend:app # команда для поднятия сервиса с моделями
 
 volumes:
   db:

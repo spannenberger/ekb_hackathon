@@ -3,7 +3,6 @@ from textwrap import dedent
 import dash
 import dash_core_components as dcc
 import dash_html_components as html
-import dash_player as player
 import numpy as np
 import pandas as pd
 import plotly.graph_objs as go
@@ -13,10 +12,18 @@ import base64
 import datetime
 import plotly.express as px
 from PIL import Image
+from typing import Dict
+import requests
+import cv2
+from tqdm import tqdm
+
 
 DEBUG = True
 FRAMERATE = 24.0
+URL = 'http://10.10.66.112:5010/api/ekb_service'
 
+content_type = 'image/jpeg'
+headers = {'content-type': content_type}
 app = dash.Dash(__name__)
 server = app.server
 
@@ -31,12 +38,16 @@ def load_data(path):
     rounded."""
 
     # Load the dataframe containing all the processed object detections inside the video
-    video_info_df = pd.read_csv(path)
+    images_info_df = pd.read_csv(path)
 
     # The list of classes, and the number of classes
-    classes_list = video_info_df["class_str"].value_counts().index.tolist()
+    file_names = images_info_df["file_name"].unique().tolist()
+    classes_list = images_info_df["class"].tolist()
+    # classes_list = video_info_df["class_str"].value_counts().index.tolist()
     n_classes = len(classes_list)
-
+    bboxes = images_info_df["bbox"].tolist()
+    final_bboxes = [eval(bbox) for bbox in bboxes]
+    # predicted_classes = images_info_df["class"].tolist()
     # Gets the smallest value needed to add to the end of the classes list to get a square matrix
     root_round = np.ceil(np.sqrt(len(classes_list)))
     total_size = root_round ** 2
@@ -50,11 +61,12 @@ def load_data(path):
     classes_matrix = np.flip(classes_matrix, axis=0)
 
     data_dict = {
-        "video_info_df": video_info_df,
+        "video_info_df": images_info_df,
         "n_classes": n_classes,
         "classes_matrix": classes_matrix,
         "classes_padded": classes_padded,
-        "root_round": root_round
+        "root_round": root_round,
+        # "final_bboxes": final_bboxes
     }
 
     if DEBUG:
@@ -62,6 +74,38 @@ def load_data(path):
 
     return data_dict
 
+def draw_contours(image_array, metadata):
+    """ Функция отрисовки контура и подсчета кол-во особей
+    Обрабатываем результат работы моделей, извлекая полученный класс животного
+    Args:
+        image_array: arr - массив-представление изображения
+        metadata: json - словарь, содержащий ответ работы моделей
+    Return:
+        counter_dict: dict - словарь с кол-вом определенных животных
+    """
+    # import pdb;pdb.set_trace()
+    for bbox in tqdm(metadata["bbox"]):
+        class_name = bbox['class_name']
+
+        # confidence = bbox['confidence']
+
+        topLeftCorner = (bbox['bbox']['x1'], bbox['bbox']['y1'])
+        botRightCorner = (bbox['bbox']['x2'], bbox['bbox']['y2'])
+
+        # center_coords = int((botRightCorner[0] + topLeftCorner[0]) / 2), int((botRightCorner[1] + topLeftCorner[1]) / 2)
+        cv2.rectangle(
+            image_array,
+            topLeftCorner,
+            botRightCorner,
+            (255, 0, 0), 
+            1
+        )
+        cv2.putText(image_array, f'{class_name}', 
+                            topLeftCorner,
+                            cv2.FONT_HERSHEY_SIMPLEX, 
+                            0.4, (255, 0, 0),
+                            1,
+                            1)
 
 def markdown_popup():
     return html.Div(
@@ -135,35 +179,16 @@ app.layout = html.Div(
                     id='header-section',
                     children=[
                         html.H4(
-                            'Object Detection Explorer'
+                            'Детекция заболеваний полости рта'
                         ),
                         html.P(
-                            'To get started, select a footage you want to view, and choose the display mode (with or without'
-                            ' bounding boxes). Then, you can start playing the video, and the visualization will '
-                            'be displayed depending on the current time.'
+                            'Для начала выберите фотоматериал материал, на котором хотите проверить сервис детекции заболеваний. Затем вы можете просмотреть результат работы сервиса и подсчитанную аналитику'
                         ),
-                        html.Button("Learn More", id="learn-more-button", n_clicks=0)
+                        html.Button("Узнать больше", id="learn-more-button", n_clicks=0)
                     ]
                 ),
                 html.Div(
-                    className='video-outer-container',
-                    children=html.Div(
-                        style={'width': '100%', 'paddingBottom': '56.25%', 'position': 'relative'},
-                        children=player.DashPlayer(
-                            id='video-display',
-                            style={'position': 'absolute', 'width': '100%',
-                                   'height': '100%', 'top': '0', 'left': '0', 'bottom': '0', 'right': '0'},
-                            url='https://www.youtube.com/watch?v=gPtn6hD7o8g',
-                            controls=True,
-                            playing=False,
-                            volume=1,
-                            width='100%',
-                            height='100%'
-                        )
-                    )
-                ),
-                html.Div(
-                    className='control-section',
+                    className='control-section', 
                     children=[
                         html.Div(
                             className='control-element',
@@ -176,13 +201,13 @@ app.layout = html.Div(
                                     ]),
                                     style={
                                         'width': '100%',
-                                        'height': '60px',
+                                        'height': '100%',
                                         'lineHeight': '60px',
                                         'borderWidth': '1px',
                                         'borderStyle': 'dashed',
-                                        'borderRadius': '5px',
+                                        'borderRadius': '1px',
                                         'textAlign': 'center',
-                                        'margin': '10px'
+                                        'margin': '1px'
                                     },
                                     # Allow multiple files to be uploaded
                                     multiple=True
@@ -197,64 +222,6 @@ app.layout = html.Div(
                         html.Div(
                             className='control-element',
                             children=[
-                                html.Div(children=["Minimum Confidence Threshold:"], style={'width': '40%'}),
-                                html.Div(dcc.Slider(
-                                    id='slider-minimum-confidence-threshold',
-                                    min=20,
-                                    max=80,
-                                    marks={i: f'{i}%' for i in range(20, 81, 10)},
-                                    value=30,
-                                    updatemode='drag'
-                                ), style={'width': '60%'})
-                            ]
-                        ),
-
-                        html.Div(
-                            className='control-element',
-                            children=[
-                                html.Div(children=["Footage Selection:"], style={'width': '40%'}),
-                                dcc.Dropdown(
-                                    id="dropdown-footage-selection",
-                                    options=[
-                                        # {'label': 'Drone recording of canal festival',
-                                        #  'value': 'DroneCanalFestival'},
-                                        # {'label': 'Drone recording of car festival', 'value': 'car_show_drone'},
-                                        # {'label': 'Drone recording of car festival #2',
-                                        #  'value': 'DroneCarFestival2'},
-                                        # {'label': 'Drone recording of a farm', 'value': 'FarmDrone'},
-                                        {'label': 'Teeth cleaning detection', 'value': 'teeth'},
-                                        # {'label': 'Man caught by a CCTV', 'value': 'ManCCTV'},
-                                        # {'label': 'Man driving expensive car', 'value': 'car_footage'},
-                                        # {'label': 'Restaurant Robbery', 'value': 'RestaurantHoldup'}
-                                    ],
-                                    value='teeth',
-                                    clearable=False,
-                                    style={'width': '60%'}
-                                )
-                            ]
-                        ),
-
-                        html.Div(
-                            className='control-element',
-                            children=[
-                                html.Div(children=["Video Display Mode:"], style={'width': '40%'}),
-                                dcc.Dropdown(
-                                    id="dropdown-video-display-mode",
-                                    options=[
-                                        {'label': 'Regular Display', 'value': 'regular'},
-                                        {'label': 'Display with Bounding Boxes', 'value': 'bounding_box'},
-                                    ],
-                                    value='bounding_box',
-                                    searchable=False,
-                                    clearable=False,
-                                    style={'width': '60%'}
-                                )
-                            ]
-                        ),
-
-                        html.Div(
-                            className='control-element',
-                            children=[
                                 html.Div(children=["Graph View Mode:"], style={'width': '40%'}),
                                 dcc.Dropdown(
                                     id="dropdown-graph-view-mode",
@@ -262,7 +229,7 @@ app.layout = html.Div(
                                         {'label': 'Visual Mode', 'value': 'visual'},
                                         {'label': 'Detection Mode', 'value': 'detection'}
                                     ],
-                                    value='visual',
+                                    value='detection',
                                     searchable=False,
                                     clearable=False,
                                     style={'width': '60%'}
@@ -307,7 +274,7 @@ def load_all_footage():
 
     # Load the dictionary containing all the variables needed for analysis
     data_dict = {
-        'teeth': load_data("data/Zebra_object_data.csv"),
+        'teeth': load_data("data/service_annot.csv"),
     }
 
     url_dict = {
@@ -320,25 +287,30 @@ def load_all_footage():
         }
     }
 
-
-# Footage Selection
-@app.callback(Output("video-display", "url"),
-              [Input('dropdown-footage-selection', 'value'),
-               Input('dropdown-video-display-mode', 'value')])
-def select_footage(footage, display_mode):
-    # Find desired footage and update player video
-    # import pdb;pdb.set_trace()
-    url = url_dict[display_mode][footage]
-    return url
-
 def parse_contents(contents, filename, date):
 
     # Remove 'data:image/png;base64' from the image string,
-    import pdb;pdb.set_trace()
+    # import pdb;pdb.set_trace()
     # see https://stackoverflow.com/a/26079673/11989081
     data = contents.replace('data:image/jpeg;base64,', '')
     # import pdb;pdb.set_trace()
-    img = Image.open(io.BytesIO(base64.b64decode(data)))
+    image = np.asarray(bytearray(base64.b64decode(data)), dtype="uint8")
+    image = cv2.imdecode(image, cv2.IMREAD_COLOR)
+    img = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+    # image_array = cv2.imread(img_path)
+    _, img_encoded = cv2.imencode('.jpg', img)
+    data = img_encoded.tostring()
+    # import pdb;pdb.set_trace()
+    response = requests.post(URL, data=data, headers=headers)
+    metadata = response.json()['image']
+    draw_contours(img, metadata)
+    image = Image.fromarray(img)
+    buffer = io.BytesIO()
+    image.save(buffer, 'PNG')
+    buffer.seek(0)
+    # import pdb;pdb.set_trace()
+    img = Image.open(buffer)
 
     # Convert the image string to numpy array and create a
     # Plotly figure, see https://plotly.com/python/imshow/
@@ -346,19 +318,8 @@ def parse_contents(contents, filename, date):
 
     # Constants
     img_width = 1600
-    img_height = 900
-    scale_factor = 0.5
-
-    # Add invisible scatter trace.
-    # This trace is added to help the autoresize logic work.
-    fig.add_trace(
-        go.Scatter(
-            x=[0, img_width * scale_factor],
-            y=[0, img_height * scale_factor],
-            mode="markers",
-            marker_opacity=0
-        )
-    )
+    img_height = 1600
+    scale_factor = 0.9
 
     # Configure axes
     fig.update_xaxes(
@@ -403,37 +364,21 @@ def parse_contents(contents, filename, date):
     [State('upload-image', 'filename'),
      State('upload-image', 'last_modified')])
 def update_output(list_of_contents, list_of_names, list_of_dates):
-    
+    # import pdb;pdb.set_trace()
     if list_of_contents is not None:
         children = [
             parse_contents(c, n, d) for c, n, d in
             zip(list_of_contents, list_of_names, list_of_dates)
         ]
         return children
-# @app.callback(Output('output-image-upload', 'children'),
-#               [Input('upload-image', 'filename')])
-# def prediction(image):
-#     # if image is None:
-#     #     raise dash.exceptios.PreventUpdate()
-#     import pdb;pdb.set_trace()
-#     print("Prediction func")
-#     # final_img = load_and_preprocess(image)
-#     # final_img = np_array_normalise(final_img)
-#     # Y = model.predict(final_img)
-#     return html.Div([
-#         html.H5(filename),
-#         html.H6(datetime.datetime.fromtimestamp(date)),
-#         dcc.Graph(
-#             figure=fig,
-#             config={'displayModeBar': True} # Always display the modebar
-#         )
-#     ])
+
 # Learn more popup
 @app.callback(Output("markdown", "style"),
               [Input("learn-more-button", "n_clicks"), Input("markdown_close", "n_clicks")])
 def update_click_output(button_click, close_click):
     if button_click > close_click:
         return {"display": "block"}
+        
     else:
         return {"display": "none"}
 
@@ -497,11 +442,8 @@ def update_detection_mode(value):
 
 # Updating Figures
 @app.callback(Output("bar-score-graph", "figure"),
-              [Input("interval-detection-mode", "n_intervals")],
-              [State("video-display", "currentTime"),
-               State('dropdown-footage-selection', 'value'),
-               State('slider-minimum-confidence-threshold', 'value')])
-def update_score_bar(n, current_time, footage, threshold):
+              [Input("interval-detection-mode", "n_intervals")])
+def update_score_bar(n):
     layout = go.Layout(
         showlegend=False,
         paper_bgcolor='rgb(249,249,249)',
@@ -515,63 +457,60 @@ def update_score_bar(n, current_time, footage, threshold):
             'range': [0, 1]
         }
     )
+    # print(current_time, FRAMERATE)
+    # if current_time is not None:
+    #     current_frame = round(current_time * FRAMERATE)
 
-    if current_time is not None:
-        current_frame = round(current_time * FRAMERATE)
+    #     if n > 0 and current_frame > 0:
+    video_info_df = data_dict["teeth"]["video_info_df"]
 
-        if n > 0 and current_frame > 0:
-            video_info_df = data_dict[footage]["video_info_df"]
+    # Select the subset of the dataset that correspond to the current frame
+    # frame_df = video_info_df[video_info_df["frame"] == current_frame]
 
-            # Select the subset of the dataset that correspond to the current frame
-            frame_df = video_info_df[video_info_df["frame"] == current_frame]
+    # Select only the frames above the threshold
+    # threshold_dec = threshold / 100  # Threshold in decimal
+    # frame_df = frame_df[frame_df["score"] > threshold_dec]
 
-            # Select only the frames above the threshold
-            threshold_dec = threshold / 100  # Threshold in decimal
-            frame_df = frame_df[frame_df["score"] > threshold_dec]
+    # Select up to 8 frames with the highest scores
+    # frame_df = frame_df[:min(8, frame_df.shape[0])]
 
-            # Select up to 8 frames with the highest scores
-            frame_df = frame_df[:min(8, frame_df.shape[0])]
+    # Add count to object names (e.g. person --> person 1, person --> person 2)
+    # objects = frame_df["class_str"].tolist()
+    # object_count_dict = {x: 0 for x in set(objects)}  # Keeps count of the objects
+    # objects_wc = []  # Object renamed with counts
+    # for object in objects:
+    #     object_count_dict[object] += 1  # Increment count
+    #     objects_wc.append(f"{object} {object_count_dict[object]}")
 
-            # Add count to object names (e.g. person --> person 1, person --> person 2)
-            objects = frame_df["class_str"].tolist()
-            object_count_dict = {x: 0 for x in set(objects)}  # Keeps count of the objects
-            objects_wc = []  # Object renamed with counts
-            for object in objects:
-                object_count_dict[object] += 1  # Increment count
-                objects_wc.append(f"{object} {object_count_dict[object]}")
+    colors = list('rgb(250,79,86)' for i in range(2))
 
-            colors = list('rgb(250,79,86)' for i in range(len(objects_wc)))
+    # Add text information
+    # y_text = [f"{round(value * 100)}% confidence" for value in video_info_df["score"].tolist()]
 
-            # Add text information
-            y_text = [f"{round(value * 100)}% confidence" for value in frame_df["score"].tolist()]
+    figure = go.Figure({
+        'data': [{'hoverinfo': 'x+text',
+                    'name': 'Detection Scores',
+                    'text': ["70%", "30%"],
+                    'type': 'bar',
+                    'x': ["teeth", "caries"],
+                    'marker': {'color': colors},
+                    'y': [0.70, 0.30]}],
+        'layout': {'showlegend': False,
+                    'autosize': False,
+                    'paper_bgcolor': 'rgb(249,249,249)',
+                    'plot_bgcolor': 'rgb(249,249,249)',
+                    'xaxis': {'automargin': True, 'tickangle': -45},
+                    'yaxis': {'automargin': True, 'range': [0, 1], 'title': {'text': 'Score'}}}
+        }
+    )
+    return figure
 
-            figure = go.Figure({
-                'data': [{'hoverinfo': 'x+text',
-                          'name': 'Detection Scores',
-                          'text': y_text,
-                          'type': 'bar',
-                          'x': objects_wc,
-                          'marker': {'color': colors},
-                          'y': frame_df["score"].tolist()}],
-                'layout': {'showlegend': False,
-                           'autosize': False,
-                           'paper_bgcolor': 'rgb(249,249,249)',
-                           'plot_bgcolor': 'rgb(249,249,249)',
-                           'xaxis': {'automargin': True, 'tickangle': -45},
-                           'yaxis': {'automargin': True, 'range': [0, 1], 'title': {'text': 'Score'}}}
-                }
-            )
-            return figure
-
-    return go.Figure(data=[go.Bar()], layout=layout)  # Returns empty bar
+    # return go.Figure(data=[go.Bar()], layout=layout)  # Returns empty bar
 
 
 @app.callback(Output("pie-object-count", "figure"),
-              [Input("interval-visual-mode", "n_intervals")],
-              [State("video-display", "currentTime"),
-               State('dropdown-footage-selection', 'value'),
-               State('slider-minimum-confidence-threshold', 'value')])
-def update_object_count_pie(n, current_time, footage, threshold):
+              [Input("interval-visual-mode", "n_intervals")])
+def update_object_count_pie(n):
     layout = go.Layout(
         showlegend=True,
         paper_bgcolor='rgb(249,249,249)',
@@ -585,50 +524,47 @@ def update_object_count_pie(n, current_time, footage, threshold):
         )
     )
 
-    if current_time is not None:
-        current_frame = round(current_time * FRAMERATE)
+    # if current_time is not None:
+    #     current_frame = round(current_time * FRAMERATE)
 
-        if n > 0 and current_frame > 0:
-            video_info_df = data_dict[footage]["video_info_df"]
+    #     if n > 0 and current_frame > 0:
+    video_info_df = data_dict["teeth"]["video_info_df"]
 
-            # Select the subset of the dataset that correspond to the current frame
-            frame_df = video_info_df[video_info_df["frame"] == current_frame]
+    # Select the subset of the dataset that correspond to the current frame
+    # frame_df = video_info_df[video_info_df["frame"] == current_frame]
 
-            # Select only the frames above the threshold
-            threshold_dec = threshold / 100  # Threshold in decimal
-            frame_df = frame_df[frame_df["score"] > threshold_dec]
+    # Select only the frames above the threshold
+    # threshold_dec = threshold / 100  # Threshold in decimal
+    # frame_df = frame_df[frame_df["score"] > threshold_dec]
 
-            # Get the count of each object class
-            class_counts = frame_df["class_str"].value_counts()
+    # Get the count of each object class
+    class_counts = video_info_df["class"].value_counts()
 
-            classes = class_counts.index.tolist()  # List of each class
-            counts = class_counts.tolist()  # List of each count
+    classes = class_counts.index.tolist()  # List of each class
+    counts = class_counts.tolist()  # List of each count
 
-            text = [f"{count} detected" for count in counts]
+    text = [f"{count} detected" for count in counts]
 
-            # Set colorscale to piechart
-            colorscale = ['#fa4f56', '#fe6767', '#ff7c79', '#ff908b', '#ffa39d', '#ffb6b0', '#ffc8c3', '#ffdbd7',
-                          '#ffedeb', '#ffffff']
+    # Set colorscale to piechart
+    colorscale = ['#fa4f56', '#fe6767', '#ff7c79', '#ff908b', '#ffa39d', '#ffb6b0', '#ffc8c3', '#ffdbd7',
+                    '#ffedeb', '#ffffff']
 
-            pie = go.Pie(
-                labels=classes,
-                values=counts,
-                text=text,
-                hoverinfo="text+percent",
-                textinfo="label+percent",
-                marker={'colors': colorscale[:len(classes)]}
-            )
-            return go.Figure(data=[pie], layout=layout)
+    pie = go.Pie(
+        labels=classes,
+        values=counts,
+        text=text,
+        hoverinfo="text+percent",
+        textinfo="label+percent",
+        marker={'colors': colorscale[:len(classes)]}
+    )
+    return go.Figure(data=[pie], layout=layout)
 
-    return go.Figure(data=[go.Pie()], layout=layout)  # Returns empty pie chart
+    # return go.Figure(data=[go.Pie()], layout=layout)  # Returns empty pie chart
 
 
 @app.callback(Output("heatmap-confidence", "figure"),
-              [Input("interval-visual-mode", "n_intervals")],
-              [State("video-display", "currentTime"),
-               State('dropdown-footage-selection', 'value'),
-               State('slider-minimum-confidence-threshold', 'value')])
-def update_heatmap_confidence(n, current_time, footage, threshold):
+              [Input("interval-visual-mode", "n_intervals")])
+def update_heatmap_confidence(n):
     layout = go.Layout(
         showlegend=False,
         paper_bgcolor='rgb(249,249,249)',
@@ -643,104 +579,106 @@ def update_heatmap_confidence(n, current_time, footage, threshold):
         )
     )
 
-    if current_time is not None:
-        current_frame = round(current_time * FRAMERATE)
+    # if current_time is not None:
+    #     current_frame = round(current_time * FRAMERATE)
 
-        if n > 0 and current_frame > 0:
+    #     if n > 0 and current_frame > 0:
             # Load variables from the data dictionary
-            video_info_df = data_dict[footage]["video_info_df"]
-            classes_padded = data_dict[footage]["classes_padded"]
-            root_round = data_dict[footage]["root_round"]
-            classes_matrix = data_dict[footage]["classes_matrix"]
+    print(data_dict.keys())
+    video_info_df = data_dict["teeth"]["video_info_df"]
+    classes_padded = data_dict["teeth"]["classes_padded"]
+    print(classes_padded)
+    root_round = data_dict["teeth"]["root_round"]
+    classes_matrix = data_dict["teeth"]["classes_matrix"]
 
-            # Select the subset of the dataset that correspond to the current frame
-            frame_df = video_info_df[video_info_df["frame"] == current_frame]
+    # Select the subset of the dataset that correspond to the current frame
+    # frame_df = video_info_df[video_info_df["frame"] == current_frame]
 
-            # Select only the frames above the threshold
-            threshold_dec = threshold / 100
-            frame_df = frame_df[frame_df["score"] > threshold_dec]
+    # Select only the frames above the threshold
+    # threshold_dec = threshold / 100
+    # frame_df = frame_df[frame_df["score"] > threshold_dec]
 
-            # Remove duplicate, keep the top result
-            frame_no_dup = frame_df[["class_str", "score"]].drop_duplicates("class_str")
-            frame_no_dup.set_index("class_str", inplace=True)
+    # Remove duplicate, keep the top result
+    frame_no_dup = video_info_df[["class", "x_from"]].drop_duplicates("class")
+    frame_no_dup.set_index("class", inplace=True)
 
-            # The list of scores
-            score_list = []
-            for el in classes_padded:
-                if el in frame_no_dup.index.values:
-                    score_list.append(frame_no_dup.loc[el][0])
-                else:
-                    score_list.append(0)
+    # The list of scores
+    score_list = []
+    for el in classes_padded:
+        if el in frame_no_dup.index.values:
+            score_list.append(frame_no_dup.loc[el][0])
+        else:
+            score_list.append(0)
 
-            # Generate the score matrix, and flip it for visual
-            score_matrix = np.reshape(score_list, (-1, int(root_round)))
-            score_matrix = np.flip(score_matrix, axis=0)
+    # Generate the score matrix, and flip it for visual
+    score_matrix = np.reshape(score_list, (-1, int(root_round)))
+    score_matrix = np.flip(score_matrix, axis=0)
 
-            # We set the color scale to white if there's nothing in the frame_no_dup
-            if frame_no_dup.shape != (0, 1):
-                colorscale = [[0, '#f9f9f9'], [1, '#fa4f56']]
+    # We set the color scale to white if there's nothing in the frame_no_dup
+    if frame_no_dup.shape != (0, 1):
+        colorscale = [[0, '#f9f9f9'], [1, '#fa4f56']]
+    else:
+        colorscale = [[0, '#f9f9f9'], [1, '#f9f9f9']]
+
+    hover_text = [f"{score * 100:.2f}% confidence" for score in score_list]
+    hover_text = np.reshape(hover_text, (-1, int(root_round)))
+    hover_text = np.flip(hover_text, axis=0)
+
+    # Add linebreak for multi-word annotation
+    classes_matrix = classes_matrix.astype(dtype='|U40')
+
+    for index, row in enumerate(classes_matrix):
+        row = list(map(lambda x: '<br>'.join(x.split()), row))
+        classes_matrix[index] = row
+
+    # Set up annotation text
+    annotation = []
+    for y_cord in range(int(root_round)):
+        for x_cord in range(int(root_round)):
+            annotation_dict = dict(
+                showarrow=False,
+                text=classes_matrix[y_cord][x_cord],
+                xref='x',
+                yref='y',
+                x=x_cord,
+                y=y_cord
+            )
+            if score_matrix[y_cord][x_cord] > 0:
+                annotation_dict['font'] = {'color': '#F9F9F9', 'size': '11'}
             else:
-                colorscale = [[0, '#f9f9f9'], [1, '#f9f9f9']]
+                annotation_dict['font'] = {'color': '#606060', 'size': '11'}
+            annotation.append(annotation_dict)
 
-            hover_text = [f"{score * 100:.2f}% confidence" for score in score_list]
-            hover_text = np.reshape(hover_text, (-1, int(root_round)))
-            hover_text = np.flip(hover_text, axis=0)
+    # Generate heatmap figure
 
-            # Add linebreak for multi-word annotation
-            classes_matrix = classes_matrix.astype(dtype='|U40')
+    figure = {
+        'data': [
+            {'colorscale': colorscale,
+                'showscale': False,
+                'hoverinfo': 'text',
+                'text': hover_text,
+                'type': 'heatmap',
+                'zmin': 0,
+                'zmax': 1,
+                'xgap': 1,
+                'ygap': 1,
+                'z': score_matrix}],
+        'layout':
+            {'showlegend': False,
+                'autosize': False,
+                'paper_bgcolor': 'rgb(249,249,249)',
+                'plot_bgcolor': 'rgb(249,249,249)',
+                'margin': {'l': 10, 'r': 10, 'b': 20, 't': 20, 'pad': 2},
+                'annotations': annotation,
+                'xaxis': {'showticklabels': False, 'showgrid': False, 'side': 'top', 'ticks': ''},
+                'yaxis': {'showticklabels': False, 'showgrid': False, 'side': 'left', 'ticks': ''}
+                }
+    }
 
-            for index, row in enumerate(classes_matrix):
-                row = list(map(lambda x: '<br>'.join(x.split()), row))
-                classes_matrix[index] = row
-
-            # Set up annotation text
-            annotation = []
-            for y_cord in range(int(root_round)):
-                for x_cord in range(int(root_round)):
-                    annotation_dict = dict(
-                        showarrow=False,
-                        text=classes_matrix[y_cord][x_cord],
-                        xref='x',
-                        yref='y',
-                        x=x_cord,
-                        y=y_cord
-                    )
-                    if score_matrix[y_cord][x_cord] > 0:
-                        annotation_dict['font'] = {'color': '#F9F9F9', 'size': '11'}
-                    else:
-                        annotation_dict['font'] = {'color': '#606060', 'size': '11'}
-                    annotation.append(annotation_dict)
-
-            # Generate heatmap figure
-
-            figure = {
-                'data': [
-                    {'colorscale': colorscale,
-                     'showscale': False,
-                     'hoverinfo': 'text',
-                     'text': hover_text,
-                     'type': 'heatmap',
-                     'zmin': 0,
-                     'zmax': 1,
-                     'xgap': 1,
-                     'ygap': 1,
-                     'z': score_matrix}],
-                'layout':
-                    {'showlegend': False,
-                     'autosize': False,
-                     'paper_bgcolor': 'rgb(249,249,249)',
-                     'plot_bgcolor': 'rgb(249,249,249)',
-                     'margin': {'l': 10, 'r': 10, 'b': 20, 't': 20, 'pad': 2},
-                     'annotations': annotation,
-                     'xaxis': {'showticklabels': False, 'showgrid': False, 'side': 'top', 'ticks': ''},
-                     'yaxis': {'showticklabels': False, 'showgrid': False, 'side': 'left', 'ticks': ''}
-                     }
-            }
-
-            return figure
+    return figure
 
     # Returns empty figure
-    return go.Figure(data=[go.Pie()], layout=layout)
+    # return go.Figure(data=[go.Pie()], layout=layout)
 
 
 # Running the server
