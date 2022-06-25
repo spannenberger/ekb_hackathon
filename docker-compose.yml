@@ -19,12 +19,7 @@ services:
   app:
     image: app
     env_file: .env
-    # resources:
-    #   reservations:
-    #     devices:
-    #       - driver: nvidia
-    #         count: 1
-    #         capabilities: [gpu]
+    runtime: nvidia
     pid: "bridge"
     ports:
       - 5010:5000

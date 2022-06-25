@@ -4,6 +4,7 @@ import cv2
 from tqdm import tqdm
 import argparse
 import os
+import pandas as pd
 
 from utils import draw_contours
 
@@ -15,6 +16,7 @@ parser.add_argument("--image_path", dest='path2images', help="path with images t
 arguments = parser.parse_args()
 
 recognitions_dir = './recognition_result'
+
 
 if not os.path.exists(recognitions_dir):
     os.mkdir(recognitions_dir)
@@ -37,6 +39,7 @@ def request2back(img_path: str) -> Dict:
 
 
 def main():
+    dataframe_result = pd.DataFrame()
 
     img_path = arguments.img_path
     path2images = arguments.path2images
@@ -46,8 +49,17 @@ def main():
         res, img = request2back(img_path)
         draw_contours(img, res)
 
+        all_teeth_count = len(res["bbox"])
+        teeth_count = len([label["class_name"] for label in res["bbox"] if label["class_name"]=="teeth"])
+        caries_count = all_teeth_count - teeth_count
+        caries_bool = 1 if caries_count > 0 else 0
+
         img_name = os.path.basename(img_path)
         cv2.imwrite(f"{recognitions_dir}/{img_name}", img)
+
+        dataframe_result = dataframe_result.append({'img_name':img_name, 'all_teeth_count':all_teeth_count,\
+                                                     'teeth_count':teeth_count, 'caries_count':caries_count,\
+                                                     'caries_bool':caries_bool}, ignore_index=True)
 
     elif path2images:
         print('Идет распознавание изображений из указанной директории')
@@ -56,10 +68,23 @@ def main():
             res, img = request2back(f'{path2images}/{image}')
             draw_contours(img, res)
 
+            all_teeth_count = len(res["bbox"])
+            teeth_count = len([label["class_name"] for label in res["bbox"] if label["class_name"]=="teeth"])
+            caries_count = all_teeth_count - teeth_count
+            caries_bool = 1 if caries_count > 0 else 0
+
             cv2.imwrite(f"{recognitions_dir}/{image}", img)
+
+            dataframe_result = dataframe_result.append({'img_name':image, 'all_teeth_count':all_teeth_count,\
+                                                    'teeth_count':teeth_count, 'caries_count':caries_count,\
+                                                    'caries_bool':caries_bool}, ignore_index=True)
+
+        
+
     else:
         print('Вы не передали ни одного значения')
-            
+
+    dataframe_result.to_csv(f"{recognitions_dir}/recognition_result.csv", index=False)
 
 if __name__=="__main__":
     main()
