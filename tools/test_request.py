@@ -12,7 +12,7 @@ def draw_contours(image_array, metadata):
     Return:
         counter_dict: dict - словарь с кол-вом определенных животных
     """
-    import pdb;pdb.set_trace()
+
     for bbox in tqdm(metadata["bbox"]):
         class_name = bbox['class_name']
 
@@ -37,7 +37,7 @@ def draw_contours(image_array, metadata):
                             1)
     return 
 # Для запуска на вашей машине нужно поменять URL на ваш локальный ip 
-URL = 'http://10.10.66.112:5010/api/ekb_service'
+URL = 'http://10.10.67.145:5010/api/ekb_service'
 
 content_type = 'image/jpeg'
 headers = {'content-type': content_type}
@@ -53,7 +53,7 @@ def test_req(img_path: str) -> Dict:
     return metadata, image_array
 
 def main():
-    img_path = 'test_images/449.jpg'
+    img_path = 'test_images/998.jpg'
     res, img = test_req(img_path)
     draw_contours(img, res)
     cv2.imwrite("test_images/test.jpg", img)

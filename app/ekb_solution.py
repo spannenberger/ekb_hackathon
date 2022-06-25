@@ -26,7 +26,7 @@ class TeethHackSolution:
         
         metric_input = (result, img)
         metric_result = self.metric_handler.process(metric_input)
-        import pdb;pdb.set_trace()
+
         for idx in range(len(result)):
             
             if metric_result['distances'][idx] > 0.01:
