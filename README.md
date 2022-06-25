@@ -23,6 +23,19 @@
 - [inference](inference) - директория с документацией для инференса моделей(прогон изображений через модели и составление csv таблицы с результатами работы)
 - [tools](tools) - директория со вспомогательными функциями
 - [requirements.txt](requirements.txt) - файл со всеми необходимыми библиотеками для работы сервиса
+### Пример .env file
+
+```
+DETECTION_MODEL=/workspace/source/detection_model/latest.pth
+DETECTION_CONFIG=/workspace/source/detection_model/config.py
+METRIC_EXTRACTOR=google/vit-base-patch16-384
+METRIC_MODEL=/workspace/source/model/
+METRIC_CSV_PATH=/workspace/source/model/embs.csv
+DB_URL=mysql+mysqlconnector://root:example@YOUR_LOCAL_IP:3306/test_db
+SERVICE_URL=YOUR_LOCAL_IP
+```
+#### Вместо YOUR_LOCAL_IP поставить Ваш локальный ip адрес
+
 ### Docker run
 Для того чтобы поднять сервис на локальной/удаленной машине нужно:
 - убедиться, что указанные порты в ```docker-compose.yml``` доступны на вашей машине
