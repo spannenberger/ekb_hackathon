@@ -32,7 +32,7 @@ METRIC_EXTRACTOR=google/vit-base-patch16-384
 METRIC_MODEL=/workspace/source/model/
 METRIC_CSV_PATH=/workspace/source/model/embs.csv
 DB_URL=mysql+mysqlconnector://root:example@YOUR_LOCAL_IP:3306/test_db
-SERVICE_URL=YOUR_LOCAL_IP
+SERVICE_URL=YOUR_LOCAL_IP/api/ekb_service
 ```
 #### Вместо YOUR_LOCAL_IP поставить Ваш локальный ip адрес
 
@@ -50,6 +50,6 @@ docker-compose up -d
 - Поздравляем, сервисы подняты
 ### Объяснение решения 
 Для решения задачи мы использовали визуальные трансформеры. В сервисе используются 2 обученные модели:
-1. Каскадная rcnn для детекции животных
-2. Визуальный трансформер (metric learning) для классификации зубов, найденных на предыдущем шаге
+1. Каскадная rcnn для детекции зубов
+2. Визуальный трансформер (metric learning) для классификации заболеваний на зубах, найденных на предыдущем шаге
 
