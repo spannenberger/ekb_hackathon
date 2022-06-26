@@ -15,11 +15,13 @@
 - [app](./app/) - папка содержащая реализацию бэка, всю логику работы моделей, инициализацию моделей
 - [dash_app](./dash_app/) - папка содержащая реализацию web-интерфейса
 - [backend.py](backend.py) - вспомогательный файл для запуска сервиса
-- [docker-compose.yml](docker-compose.yml) - конфиг докера для сборки и поднятия сервиса и бота с нужными портами и тд
+- [docker-compose.yml](docker-compose.yml) - конфиг докера для сборки и поднятия наших сервисов
 - [Dockerfile](Dockerfile) - докер файл сервиса, отвечающий за окружение и установку нужных пакетов, библиотек
 - [full_base_file.csv](full_base_file.csv) - csv таблица с усредненными эмбеддингами классов - нужна для подсчета близжайших классов для изображения
 - [install_models.sh](install_models.sh) - скрипт для выгрузки моделей с облака
 - [INFERENCE.md](INFERENCE.md) - документация по прогону ваших данных через модель
+- [inference](inference) - директория с документацией для инференса моделей(прогон изображений через модели и составление csv таблицы с результатами работы)
+- [init_db_table.sql](init_db_table.sql) - скрипт инициализации БД и таблицы внутри нее, используемые в сервисе
 - [inference](inference) - директория с документацией для инференса моделей(прогон изображений через модели и составление csv таблицы с результатами работы)
 - [tools](tools) - директория со вспомогательными функциями
 - [requirements.txt](requirements.txt) - файл со всеми необходимыми библиотеками для работы сервиса
@@ -31,19 +33,19 @@ DETECTION_CONFIG=/workspace/source/detection_model/config.py
 METRIC_EXTRACTOR=google/vit-base-patch16-384
 METRIC_MODEL=/workspace/source/model/
 METRIC_CSV_PATH=/workspace/source/model/embs.csv
-DB_URL=mysql+mysqlconnector://root:example@YOUR_LOCAL_IP:3306/test_db
+DB_URL=mysql+mysqlconnector://root:example@YOUR_LOCAL_IP:3306/ekb_service
 SERVICE_URL=YOUR_LOCAL_IP/api/ekb_service
 ```
 #### Вместо YOUR_LOCAL_IP поставить Ваш локальный ip адрес
 
-### Docker run
+### Запуск решения
 Для того чтобы поднять сервис на локальной/удаленной машине нужно:
 - убедиться, что указанные порты в ```docker-compose.yml``` доступны на вашей машине
-- запустить скрипт сборки docker контейнеров:
+- запустить команду сборки:
 ```
 docker-compose build
 ```
-- запустить скрипт поднятия сервисов:
+- запустить команду поднятия сервисов:
 ```
 docker-compose up -d
 ```
