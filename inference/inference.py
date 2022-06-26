@@ -73,7 +73,7 @@ def main():
 
     elif path2images:
         print('Идет распознавание изображений из указанной директории')
-        image_files = [i for i in os.listdir(path2images) if i.endswith('.jpg')]
+        image_files = [i for i in os.listdir(path2images) if i.endswith(('.jpg', '.png'))]
         for image in tqdm(image_files):
             res, img = request2back(f'{path2images}/{image}')
             draw_contours(img, res)
