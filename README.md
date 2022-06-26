@@ -10,6 +10,7 @@
 
 # User guide
 ### Структура репозитория
+- [hyper_popis.csv](hyper_popis.csv) - результат работы сервиса на `тестовых данных`
 - [teeth_metric_learning.ipynb](teeth_metric_learning.ipynb) - код для обучения классификатора
 - [teeth-caries.ipynb](teeth-caries.ipynb) - код для обучения детектора
 - [app](./app/) - папка содержащая реализацию бэка, всю логику работы моделей, инициализацию моделей
